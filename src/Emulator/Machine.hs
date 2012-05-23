@@ -1,5 +1,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Emulator.Machine
 (Machine(..)
 ,runMachine
@@ -36,8 +39,8 @@ instance Monad m => StateM (FDX m) Machine where
   get = derive_get iso_FDX
   set = derive_set iso_FDX
 
-instance MonadT FDX where
-  lift m = FDX (lift m)
+instance BaseM m m => BaseM (FDX m) m where
+  inBase = FDX . inBase
 
 getRegisters :: Monad m => FDX m Registers
 getRegisters = do

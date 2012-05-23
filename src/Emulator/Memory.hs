@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Emulator.Memory where
 
 import Prelude hiding ( replicate, read )
@@ -14,5 +15,5 @@ addressSize = 2^(16::Int)
 memory :: IO Memory
 memory = replicate addressSize 0
 
-fetchByte :: MonadT m => Word16 -> Memory -> m IO Word8
-fetchByte addr m = lift (read m (fromIntegral addr))
+fetchByte :: BaseM m IO => Word16 -> Memory -> m Word8
+fetchByte addr m = inBase (read m (fromIntegral addr))
