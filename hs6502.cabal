@@ -1,0 +1,27 @@
+name:                hs6502
+version:             0.1.0.0
+synopsis:            emulator for the 6502 cpu
+description:         
+license:             BSD3
+license-file:        LICENSE
+author:              Jason Dagit
+maintainer:          dagitj@gmail.com
+copyright:           Copyright 2012
+
+category:            Emulator
+
+build-type:          Simple
+
+cabal-version:       >=1.8
+
+executable hs6502
+  -- .hs or .lhs file containing the Main module.
+  main-is:             Main.hs
+  
+  -- Modules included in this executable, other than Main.
+  -- other-modules:       
+  hs-source-dirs:      src
+  
+  -- Other library packages from which modules are imported.
+  build-depends:       base >= 3 && < 5
+  
