@@ -36,6 +36,7 @@ mkRegisters = Registers
   }
 
 -- | all the status register flags in a handy list
+allSRFlags :: [SRFlag]
 allSRFlags = [Carry .. Negative]
 
 -- | Look up the value of a particular flag by name.

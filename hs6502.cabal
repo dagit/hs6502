@@ -19,9 +19,13 @@ executable hs6502
   main-is:             Main.hs
   
   -- Modules included in this executable, other than Main.
-  -- other-modules:       
+  other-modules:       Emulator.Memory,
+                       Emulator.Registers
   hs-source-dirs:      src
   
   -- Other library packages from which modules are imported.
-  build-depends:       base >= 3 && < 5
-  
+  build-depends:       base >= 3 && < 5,
+                       vector == 0.9.*,
+                       monadLib == 3.6.*
+  ghc-options: -Wall -O2
+  ghc-prof-options: -fprof-auto
