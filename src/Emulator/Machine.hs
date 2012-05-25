@@ -2,6 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Emulator.Machine
 (Machine(..)
+,AddressMode(..)
 ,runMachine
 ,FDX
 ,getRegisters
@@ -59,3 +60,12 @@ setMemory m = do
   mem <- get
   set (mem { mMem = m })
 
+data AddressMode = Immediate
+                 | Zeropage
+                 | ZeropageX
+                 | Absolute
+                 | AbsoluteX
+                 | AbsoluteY
+                 | IndirectX
+                 | IndirectY
+                 | Accumulator

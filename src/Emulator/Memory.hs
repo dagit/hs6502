@@ -17,3 +17,6 @@ memory = replicate addressSize 0
 
 fetchByte :: BaseM m IO => Word16 -> Memory -> m Word8
 fetchByte addr m = inBase (read m (fromIntegral addr))
+
+writeByte :: BaseM m IO => Word16 -> Word8 -> Memory -> m ()
+writeByte addr b m = inBase (write m (fromIntegral addr) b)
