@@ -71,6 +71,7 @@ branchOn test = do
       pc'    = pc + fromIntegral offset
   when c (setPC pc')
 
+-- TODO: refactor cmp, cpx, and cpy
 cmp :: AddressMode -> FDX ()
 cmp mode = do
   b  <- fetchOperand mode
@@ -86,6 +87,14 @@ cpx mode = do
   setFlag Carry (x >= b)
   setFlag Zero  (x == b)
   setFlag Negative (testBit (x - b) 7)
+
+cpy :: AddressMode -> FDX ()
+cpy mode = do
+  b <- fetchOperand mode
+  y <- getReg rY
+  setFlag Carry (y >= b)
+  setFlag Zero  (y == b)
+  setFlag Negative (testBit (y - b) 7)
 
 testBits :: AddressMode -> FDX ()
 testBits mode = do
@@ -369,6 +378,14 @@ execute opc = case opc of
   0xE0 -> cpx Immediate
   0xE4 -> cpx Zeropage
   0xEC -> cpx Absolute
+  -- Compare Memory and Index Y
+  -- Y - M
+  -- N Z C I D V
+  -- + + + - - -
+  0xC0 -> cpy Immediate
+  0xC4 -> cpy Zeropage
+  0xCC -> cpy Absolute
+  
   -- TODO: all unimplemented opcodes are nop
   _ -> do
     return ()
