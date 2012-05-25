@@ -1,60 +1,76 @@
 {-# LANGUAGE BangPatterns #-}
 module Emulator.Instructions where
 
-import Emulator.Memory
+import qualified Emulator.Memory as Mem
 import Emulator.Registers
 import Emulator.Machine
 
 import Data.Word
 import Data.Bits
 
-getReg :: Monad m => (Registers -> a) -> FDX m a
+getReg :: (Registers -> a) -> FDX a
 getReg f = do
   rs <- getRegisters
   return $! f rs
 
-getPC :: Monad m => FDX m Word16
+getPC :: FDX Word16
 getPC = getReg rPC
 
-setPC :: Monad m => Word16 -> FDX m ()
+setPC :: Word16 -> FDX ()
 setPC !pc = do
   rs <- getRegisters
   setRegisters $! rs { rPC = pc }
   
-incPC :: Monad m => FDX m ()
+incPC :: FDX ()
 incPC = do
   pc <- getPC
   setPC $! 1+pc
 
-getAC :: Monad m => FDX m Word8
+getAC :: FDX Word8
 getAC = getReg rAC
 
-setAC :: Monad m => Word8 -> FDX m ()
+setAC :: Word8 -> FDX ()
 setAC !w = do
   rs <- getRegisters
   setRegisters $! rs { rAC = w }
 
-getX :: Monad m => FDX m Word8
+incACBy :: FDX Word8 -> FDX ()
+  -- ADC, Add Memory to Accumulator with Carry
+  -- A + M + C -> A, C
+  -- N Z C I D V
+  -- + + + - - +
+  --
+incACBy by = do
+  ac <- getAC
+  m <- by 
+  -- TODO: update status register
+  -- TODO: add carry bit
+  setAC $! ac + m
+
+getX :: FDX Word8
 getX = getReg rX
 
-getY :: Monad m => FDX m Word8
+getY :: FDX Word8
 getY = getReg rY
 
-fetchByteAtPC :: FDX IO Word8
+fetchByteMem :: Word16 -> FDX Word8
+fetchByteMem addr = do
+  mem <- getMemory
+  Mem.fetchByte addr mem
+
+fetchByteAtPC :: FDX Word8
 fetchByteAtPC = do
   pc  <- getPC
-  mem <- getMemory
   incPC
-  b <- fetchByte pc mem
-  return b
+  fetchByteMem pc
 
-fetchWordAtPC :: FDX IO Word16
+fetchWordAtPC :: FDX Word16
 fetchWordAtPC = do
   low  <- fetchByteAtPC
   high <- fetchByteAtPC
   return $! mkWord low high
 
-fetchBytesAtPC :: Int -> FDX IO [Word8]
+fetchBytesAtPC :: Int -> FDX [Word8]
 fetchBytesAtPC 0        = return []
 fetchBytesAtPC numBytes = do
   b  <- fetchByteAtPC
@@ -69,76 +85,50 @@ mkWord !lb !hb = (hw `shiftL` 8) + lw
   lw = fromIntegral lb :: Word16
   hw = fromIntegral hb :: Word16
 
-fdx :: FDX IO ()
+fdx :: FDX ()
 fdx = do
   b <- fetchByteAtPC
   execute b
   fdx
 
-execute :: Word8 -> FDX IO ()
+execute :: Word8 -> FDX ()
 execute opc = case opc of
   -- ADC, Add Memory to Accumulator with Carry
   -- A + M + C -> A, C
   -- N Z C I D V
   -- + + + - - +
   --
-  0x69 -> do
-    m  <- fetchByteAtPC
-    ac <- getAC
-    -- TODO: update status register
-    setAC $! ac + m
-  0x65 -> do
-    b   <- fetchByteAtPC
-    mem <- getMemory
-    ac  <- getAC
-    m   <- fetchByte (fromIntegral b) mem -- zeropage
-    setAC $! ac + m
-  0x75 -> do
-    b   <- fetchByteAtPC
-    x   <- getX
-    mem <- getMemory
-    ac  <- getAC
-    m   <- fetchByte (fromIntegral (b + x)) mem -- zeropage
-    setAC $! ac + m
-  0x6D -> do
-    w   <- fetchWordAtPC
-    mem <- getMemory
-    ac  <- getAC
-    m   <- fetchByte w mem
-    setAC $! ac + m
-  0x7D -> do
-    w   <- fetchWordAtPC
-    mem <- getMemory
-    x   <- getX
-    ac  <- getAC
+  0x69 -> incACBy fetchByteAtPC
+  0x65 -> incACBy $ do
+    b <- fetchByteAtPC
+    fetchByteMem (fromIntegral b)
+  0x75 -> incACBy $ do
+    b <- fetchByteAtPC
+    x <- getX
+    fetchByteMem (fromIntegral (b + x)) -- zeropage
+  0x6D -> incACBy (fetchWordAtPC >>= fetchByteMem)
+  0x7D -> incACBy $ do
+    w <- fetchWordAtPC
+    x <- getX
     -- TODO: what does it mean to increment the address with carry?
-    m   <- fetchByte (w + (fromIntegral x)) mem
-    setAC $! ac + m
-  0x79 -> do
-    w   <- fetchWordAtPC
-    mem <- getMemory
-    y   <- getY
-    ac  <- getAC
+    -- I think it means that you convert x to 16 bit and then add
+    fetchByteMem (w + (fromIntegral x))
+  0x79 -> incACBy $ do
+    w <- fetchWordAtPC
+    y <- getY
     -- TODO: what does it mean to increment the address with carry?
     -- I think it means that you convert y to 16 bit and then add
-    m   <- fetchByte (w + (fromIntegral y)) mem
-    setAC $! ac + m
-  0x61 -> do
-    b   <- fetchByteAtPC
-    mem <- getMemory
-    x   <- getX
-    ac  <- getAC
-    m   <- fetchByte (fromIntegral (b + x)) mem -- zeropage indexed by x
-    setAC $! ac + m
-  0x71 -> do
-  -- TODO: I don't understand this one at all...
-    b   <- fetchByteAtPC
-    mem <- getMemory
-    y   <- getY
-    ac  <- getAC
+    fetchByteMem (w + (fromIntegral y))
+  0x61 -> incACBy $ do
+    b <- fetchByteAtPC
+    x <- getX
+    fetchByteMem (fromIntegral (b + x)) -- zeropage indexed by x
+  0x71 -> incACBy $ do
+    -- TODO: I don't understand this one at all...
+    b <- fetchByteAtPC
+    y <- getY
     -- I think with carry means to promote b,y to Word16 then add
-    m   <- fetchByte (fromIntegral b + fromIntegral y) mem
-    setAC $! ac + m
+    fetchByteMem (fromIntegral b + fromIntegral y)
   -- TODO: all unimplemented opcodes are nop
   _ -> do
     return ()

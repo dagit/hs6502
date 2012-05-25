@@ -19,7 +19,7 @@ main = do
   write mem 0 0x69
   write mem 1 40
   let machine = Machine rs mem
-      step :: FDX IO ()
+      step :: FDX ()
       step = do
         b <- fetchByteAtPC
         execute b

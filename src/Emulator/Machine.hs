@@ -1,8 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
 module Emulator.Machine
 (Machine(..)
 ,runMachine
@@ -26,38 +23,38 @@ data Machine = Machine
   }
 
 -- | FDX is fetch-decode-execute
-newtype FDX m a = FDX { unFDX :: StateT Machine m a }
+newtype FDX a = FDX { unFDX :: StateT Machine IO a }
   deriving (Functor, Monad, Applicative)
 
-runMachine :: Monad m => FDX m a -> Machine -> m (a, Machine)
+runMachine :: FDX a -> Machine -> IO (a, Machine)
 runMachine f m = runStateT m (unFDX f)
 
-iso_FDX :: Iso (StateT Machine m) (FDX m)
+iso_FDX :: Iso (StateT Machine IO) FDX
 iso_FDX = Iso FDX unFDX
 
-instance Monad m => StateM (FDX m) Machine where
+instance StateM FDX Machine where
   get = derive_get iso_FDX
   set = derive_set iso_FDX
 
-instance BaseM m m => BaseM (FDX m) m where
+instance BaseM FDX IO where
   inBase = FDX . inBase
 
-getRegisters :: Monad m => FDX m Registers
+getRegisters :: FDX Registers
 getRegisters = do
   m <- get
   return (mRegs m)
 
-setRegisters :: Monad m => Registers -> FDX m ()
+setRegisters :: Registers -> FDX ()
 setRegisters rs = do
   m <- get
   set ( m { mRegs = rs } )
 
-getMemory :: Monad m => FDX m Memory
+getMemory :: FDX Memory
 getMemory = do
   m <- get
   return (mMem m)
 
-setMemory :: Monad m => Memory -> FDX m ()
+setMemory :: Memory -> FDX ()
 setMemory m = do
   mem <- get
   set (mem { mMem = m })
