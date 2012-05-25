@@ -64,12 +64,20 @@ asl mode = modifyOperand mode $ \b -> do
 
 branchOn :: FDX Bool -> FDX ()
 branchOn test = do
- b  <- fetchOperand Immediate
- pc <- getReg rPC
- c  <- test
- let offset = fromIntegral b :: Int8 -- make it signed
-     pc'    = pc + fromIntegral offset
- when c (setPC pc')
+  b  <- fetchOperand Immediate
+  pc <- getReg rPC
+  c  <- test
+  let offset = fromIntegral b :: Int8 -- make it signed
+      pc'    = pc + fromIntegral offset
+  when c (setPC pc')
+
+cmp :: AddressMode -> FDX ()
+cmp mode = do
+  b  <- fetchOperand mode
+  ac <- getReg rAC
+  setFlag Carry (ac >= b)
+  setFlag Zero  (ac == b)
+  setFlag Negative (testBit (ac - b) 7)
 
 testBits :: AddressMode -> FDX ()
 testBits mode = do
@@ -334,6 +342,18 @@ execute opc = case opc of
   -- N Z C I D V
   -- - - - - - 0
   0xB8 -> setFlag Overflow False
+  -- CMP, Compare Memory with Accumulator
+  -- A - M
+  -- N Z C I D V
+  -- + + + - - -
+  0xC9 -> cmp Immediate
+  0xC5 -> cmp Zeropage
+  0xD5 -> cmp ZeropageX
+  0xCD -> cmp Absolute
+  0xDD -> cmp AbsoluteX
+  0xD9 -> cmp AbsoluteY
+  0xC1 -> cmp IndirectX
+  0xD1 -> cmp IndirectY
   -- TODO: all unimplemented opcodes are nop
   _ -> do
     return ()
