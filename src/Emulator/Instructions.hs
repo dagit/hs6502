@@ -71,30 +71,13 @@ branchOn test = do
       pc'    = pc + fromIntegral offset
   when c (setPC pc')
 
--- TODO: refactor cmp, cpx, and cpy
-cmp :: AddressMode -> FDX ()
-cmp mode = do
-  b  <- fetchOperand mode
-  ac <- getReg rAC
-  setFlag Carry (ac >= b)
-  setFlag Zero  (ac == b)
-  setFlag Negative (testBit (ac - b) 7)
-
-cpx :: AddressMode -> FDX ()
-cpx mode = do
+cmp :: (Registers -> Word8) -> AddressMode -> FDX ()
+cmp s mode = do
   b <- fetchOperand mode
-  x <- getReg rX
-  setFlag Carry (x >= b)
-  setFlag Zero  (x == b)
-  setFlag Negative (testBit (x - b) 7)
-
-cpy :: AddressMode -> FDX ()
-cpy mode = do
-  b <- fetchOperand mode
-  y <- getReg rY
-  setFlag Carry (y >= b)
-  setFlag Zero  (y == b)
-  setFlag Negative (testBit (y - b) 7)
+  r <- getReg s
+  setFlag Carry (r >= b)
+  setFlag Zero  (r == b)
+  setFlag Negative (testBit (r - b) 7)
 
 testBits :: AddressMode -> FDX ()
 testBits mode = do
@@ -363,28 +346,28 @@ execute opc = case opc of
   -- A - M
   -- N Z C I D V
   -- + + + - - -
-  0xC9 -> cmp Immediate
-  0xC5 -> cmp Zeropage
-  0xD5 -> cmp ZeropageX
-  0xCD -> cmp Absolute
-  0xDD -> cmp AbsoluteX
-  0xD9 -> cmp AbsoluteY
-  0xC1 -> cmp IndirectX
-  0xD1 -> cmp IndirectY
+  0xC9 -> cmp rAC Immediate
+  0xC5 -> cmp rAC Zeropage
+  0xD5 -> cmp rAC ZeropageX
+  0xCD -> cmp rAC Absolute
+  0xDD -> cmp rAC AbsoluteX
+  0xD9 -> cmp rAC AbsoluteY
+  0xC1 -> cmp rAC IndirectX
+  0xD1 -> cmp rAC IndirectY
   -- Compare Memory and Index X
   -- X - M
   -- N Z C I D V
   -- + + + - - -
-  0xE0 -> cpx Immediate
-  0xE4 -> cpx Zeropage
-  0xEC -> cpx Absolute
+  0xE0 -> cmp rX Immediate
+  0xE4 -> cmp rX Zeropage
+  0xEC -> cmp rX Absolute
   -- Compare Memory and Index Y
   -- Y - M
   -- N Z C I D V
   -- + + + - - -
-  0xC0 -> cpy Immediate
-  0xC4 -> cpy Zeropage
-  0xCC -> cpy Absolute
+  0xC0 -> cmp rY Immediate
+  0xC4 -> cmp rY Zeropage
+  0xCC -> cmp rY Absolute
   
   -- TODO: all unimplemented opcodes are nop
   _ -> do
