@@ -79,6 +79,14 @@ cmp mode = do
   setFlag Zero  (ac == b)
   setFlag Negative (testBit (ac - b) 7)
 
+cpx :: AddressMode -> FDX ()
+cpx mode = do
+  b <- fetchOperand mode
+  x <- getReg rX
+  setFlag Carry (x >= b)
+  setFlag Zero  (x == b)
+  setFlag Negative (testBit (x - b) 7)
+
 testBits :: AddressMode -> FDX ()
 testBits mode = do
   b  <- fetchOperand mode
@@ -354,6 +362,13 @@ execute opc = case opc of
   0xD9 -> cmp AbsoluteY
   0xC1 -> cmp IndirectX
   0xD1 -> cmp IndirectY
+  -- Compare Memory and Index X
+  -- X - M
+  -- N Z C I D V
+  -- + + + - - -
+  0xE0 -> cpx Immediate
+  0xE4 -> cpx Zeropage
+  0xEC -> cpx Absolute
   -- TODO: all unimplemented opcodes are nop
   _ -> do
     return ()
