@@ -63,9 +63,13 @@ setMemory m = do
 data AddressMode = Immediate
                  | Zeropage
                  | ZeropageX
+                 | ZeropageY
                  | Absolute
                  | AbsoluteX
                  | AbsoluteY
                  | IndirectX
                  | IndirectY
                  | Accumulator
+                 | X
+                 | Y
+                 | SP
