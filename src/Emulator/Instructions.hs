@@ -158,8 +158,7 @@ load src dest = modifyOperand dest $ \_ -> do
   return m
 
 store :: AddressMode -> AddressMode -> FDX ()
-store src dest = modifyOperand dest $ \_ -> do
-  fetchOperand src
+store src dest = modifyOperand dest (const (fetchOperand src))
 
 branchOn :: FDX Bool -> FDX ()
 branchOn test = do
@@ -230,10 +229,23 @@ setFlag f b = do
  setFlagBit rs True  = setSRFlag rs f
  setFlagBit rs False = clearSRFlag rs f
 
+-- | Fetches a byte from the provided
+-- address.
 fetchByteMem :: Word16 -> FDX Word8
 fetchByteMem addr = do
   mem <- getMemory
   Mem.fetchByte addr mem
+
+-- | Fetches a word located at an address
+-- stored in the zero page. That means
+-- we only need an 8bit address, but we
+-- also read address+1
+fetchWordMem :: Word8 -> FDX Word16
+fetchWordMem addr = do
+  mem <- getMemory
+  lo  <- Mem.fetchByte (toWord addr)     mem
+  hi  <- Mem.fetchByte (toWord (addr+1)) mem
+  return $! mkWord lo hi
 
 writeByteMem :: Word16 -> Word8 -> FDX ()
 writeByteMem addr b = do
@@ -283,29 +295,27 @@ fetchOperand ZeropageY = do
   b <- fetchByteAtPC
   y <- getReg rY
   fetchByteMem (toWord (b + y)) -- stay on the zeropage but add y
-fetchOperand Absolute  = (fetchWordAtPC >>= fetchByteMem)
+fetchOperand Absolute  = fetchWordAtPC >>= fetchByteMem
 fetchOperand AbsoluteX = do
   w <- fetchWordAtPC
   x <- getReg rX
-  -- TODO: what does it mean to increment the address with carry?
-  -- I think it means that you convert x to 16 bit and then add
   fetchByteMem (w + (toWord x))
 fetchOperand AbsoluteY = do
   w <- fetchWordAtPC
   y <- getReg rY
-  -- TODO: what does it mean to increment the address with carry?
-  -- I think it means that you convert y to 16 bit and then add
   fetchByteMem (w + (toWord y))
 fetchOperand IndirectX = do
-  b <- fetchByteAtPC
-  x <- getReg rX
-  fetchByteMem (toWord (b + x)) -- zeropage indexed by x
+  b    <- fetchByteAtPC
+  x    <- getReg rX
+  addr <- fetchWordMem (b + x) -- zeropage index plus x
+  fetchByteMem addr
 fetchOperand IndirectY = do
-  -- TODO: I don't understand this one at all...
-  b <- fetchByteAtPC
-  y <- getReg rY
-  -- I think with carry means to promote b,y to Word16 then add
-  fetchByteMem (toWord b + toWord y)
+  -- In this case, we add the value in Y to the address pointed
+  -- to by the zeropage address, and then fetch the byte there.
+  b    <- fetchByteAtPC
+  addr <- fetchWordMem b
+  y    <- getReg rY
+  fetchByteMem (addr + toWord y)
 fetchOperand Accumulator = getReg rAC
 fetchOperand X           = getReg rX
 fetchOperand Y           = getReg rY
@@ -357,16 +367,16 @@ modifyOperand AbsoluteY op = do
 modifyOperand IndirectX op = do
   b <- fetchByteAtPC
   x <- getReg rX
-  let addr = toWord (b + x) -- zeropage indexed by x
-  v  <- fetchByteMem addr
-  v' <- op v
+  let zeroPageAddr = b + x -- zeropage indexed by b + x
+  addr <- fetchWordMem zeroPageAddr
+  v    <- fetchByteMem addr
+  v'   <- op v
   writeByteMem addr v'
 modifyOperand IndirectY op = do
-  -- TODO: I don't understand this one at all...
   b <- fetchByteAtPC
   y <- getReg rY
-  -- I think with carry means to promote b,y to Word16 then add
-  let addr = toWord b + toWord y
+  v <- fetchWordMem b -- zeropage indexed by b, add y to result
+  let addr = v + toWord y
   v  <- fetchByteMem addr
   v' <- op v
   writeByteMem addr v'
